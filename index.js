@@ -8,6 +8,8 @@ require('dotenv/config')
 const upload= require('express-fileupload')
 
 const app = express()
+// app.use('/uploads',express.static(__dirname + './uploads'))
+app.use('/uploads', express.static('uploads'));
 
 app.use(express.json({extended : true}))
 app.use(express.urlencoded({extended : true}))
@@ -22,7 +24,6 @@ app.use('/api/posts',postRoutes)
 
 app.use(notFound)
 app.use(errorHandler)
-app.use('/uploads',express.static(__dirname + '/uploads'))
 
 app.listen(5000,()=>{
     console.log('Server is running at post 5000')

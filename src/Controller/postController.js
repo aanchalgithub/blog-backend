@@ -4,6 +4,7 @@ const path = require('path')
 const fs = require('fs')
 const {v4 : uuid} = require('uuid')
 const HttpError = require('../Models/errorModel')
+const { default: mongoose } = require('mongoose')
 
 
 
@@ -11,6 +12,7 @@ const HttpError = require('../Models/errorModel')
 // POST : api/posts
 //PROTECTED
 const createPost = async(req,res,next) => {
+  
     try {
         let {title, category, description} = req.body
         if(!title || !category || !description || !req.files){
@@ -25,7 +27,7 @@ const createPost = async(req,res,next) => {
         let fileName = thumbnail.name;
         let splittedFleName = fileName.split('.');
         let newFileName = splittedFleName[0] + uuid() + '.' + splittedFleName[splittedFleName.length -1]
-        thumbnail.mv(path.join(__dirname, '..', '/uploads', newFileName), async (err) => {
+        thumbnail.mv(path.join(__dirname, '../..', '/uploads', newFileName), async (err) => {
             if(err){
                 return next(new HttpError(err))
             } else {
@@ -54,7 +56,21 @@ const createPost = async(req,res,next) => {
 //UNPROTECTED
 const getPosts = async(req,res,next) => {
     try {
-        const posts = await Post.find().sort({updatedAt : -1})
+        const posts = await Post.aggregate([
+            {
+              '$lookup': {
+                'from': 'users', 
+                'localField': 'creator', 
+                'foreignField': '_id', 
+                'as': 'user'
+              }
+            }, {
+              '$unwind': {
+                'path': '$user', 
+                'preserveNullAndEmptyArrays': true
+              }
+            }
+          ])
         res.status(200).json(posts)
     } catch (error) {
         return next(new HttpError(error))
@@ -67,13 +83,34 @@ const getPosts = async(req,res,next) => {
 
 const getPost = async(req,res,next) => {
     try {
+        
         const postId = req.params.id
-        const post = await Post.findById(postId)
-        if(!post){
+        const post = await Post.aggregate([
+          {
+            $match:{
+              _id:new mongoose.Types.ObjectId(postId)
+            }
+          },
+          {
+            '$lookup': {
+              'from': 'users', 
+              'localField': 'creator', 
+              'foreignField': '_id', 
+              'as': 'user'
+            }
+          }, {
+            '$unwind': {
+              'path': '$user', 
+              'preserveNullAndEmptyArrays': true
+            }
+          }
+
+        ])
+        if(!post?.length){
             return next(new HttpError("Post not Found 404 !!!",404))
         }
-
-        res.status(200).json(post)
+const data=post?.length>0?post[0]:{}
+        res.status(200).json(data)
     } catch (error) {
         return next(new HttpError(error))
     }
@@ -83,30 +120,78 @@ const getPost = async(req,res,next) => {
 // POST : api/posts/categories/:category
 //UNPROTECTED
 
-const getCatPosts = async(req,res,next) => {
+const getCatPosts = async (req, res, next) => {
     try {
-        const {category} = req.params
-        const catPosts = await Post.find({category}).sort({createdAt : -1})
-        res.status(200).json(catPosts)
+      const { category } = req.params;
+  
+      
+      const posts = await Post.aggregate([
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'creator',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        {
+          $unwind: {
+            path: '$user',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $match: { category }, 
+        },
+        {
+          $sort: { createdAt: -1 },
+        },
+      ]);
+  
+    
+  
+      res.status(200).json(posts);
     } catch (error) {
-        return next(new HttpError(error))
+      return next(new HttpError(error)); 
     }
-}
-
+  };
 
 //----------------------------------GET the Author Post--------------------------------------
 // POST : api/posts/users/:id
 //PROTECTED
 
-const getUserPosts = async(req,res,next) => {
+const getUserPosts = async (req, res, next) => {
     try {
-        const {id} = req.params
-        const posts = await Post.find({creator : id}).sort({createdAt : -1})
-        res.status(200).json(posts)
+      const { id } = req.params;
+  
+      const posts = await Post.aggregate([
+        {
+          $match: { creator: new mongoose.Types.ObjectId(id) }, 
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'creator',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        {
+          $unwind: {
+            path: '$user',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $sort: { createdAt: -1 }, 
+        },
+      ]);
+  
+      res.status(200).json(posts);
     } catch (error) {
-        return next(new HttpError(error))
+      return next(new HttpError(error));
     }
-}
+  };
 
 
 //----------------------------------Edit Post--------------------------------------
@@ -136,7 +221,7 @@ const editPost = async (req, res, next) => {
             // Get old post from database
             const oldPost = await Post.findById(postId);
             // Delete old thumbnail from upload
-            fs.unlink(path.join(__dirname, '..', 'uploads', oldPost.thumbnail), async (err) => {
+            fs.unlink(path.join(__dirname, '../..', 'uploads', oldPost.thumbnail), async (err) => {
                 if (err) {
                     return next(new HttpError(err));
                 }
@@ -150,7 +235,7 @@ const editPost = async (req, res, next) => {
             fileName = thumbnail.name;
             let splittedFileName = fileName.split('.');
             newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1];
-            thumbnail.mv(path.join(__dirname, '..', 'uploads', newFileName), async (err) => {
+            thumbnail.mv(path.join(__dirname, '../..', 'uploads', newFileName), async (err) => {
                 if (err) {
                     return next(new HttpError(err));
                 }
@@ -182,7 +267,7 @@ const deletePost = async(req,res,next) => {
         const fileName = post?.thumbnail
         if(req.user.id == post.creator){
             //Delete thumbnail from uploads folder
-            fs.unlink(path.join(__dirname, '..', 'uploads', fileName), async (err) => {
+            fs.unlink(path.join(__dirname, '../..', 'uploads', fileName), async (err) => {
                 if(err){
                     return next(new HttpError(err))
                 }else{

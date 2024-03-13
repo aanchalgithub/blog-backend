@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken')
 const HttpError = require('../Models/errorModel')
 
 const authMiddleware = async (req, res, next)=>{
+    console.log('ddjdjjdjd')
     const Authorization = req.headers.Authorization || req.headers.authorization
 
 

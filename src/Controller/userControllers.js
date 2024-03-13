@@ -112,15 +112,20 @@ const changeAvtar = async(req, res, next) => {
         
         //User from data base
         const user = await User.findById(req.user.id)
-        console.log(req.user.id);
+        
         // delete old photo if exist
         if(user.avtar){
-            fs.unlink(path.join((__dirname, '..','uploads', user.avtar), (err) =>{
+            console.log(user.avtar);
+            console.log(path.join(__dirname, '../..','uploads', user.avtar));
+            fs.unlink(path.join(__dirname, '../..','uploads', user.avtar), (err) =>{
+                
                 if(err){
+                    
                     return next(new HttpError(err))
                 }
+                
             }
-            ))
+            )
         }
         const {avtar} = req.files
 
@@ -130,8 +135,9 @@ const changeAvtar = async(req, res, next) => {
          let splittedFilename = filename.split('.')
  
          let newFilename = splittedFilename[0] + uuid() + '.' + splittedFilename[splittedFilename.length -1]
-         avtar.mv(path.join(__dirname, '..', 'uploads',newFilename), async (err)=>{
+         avtar.mv(path.join(__dirname, '../..', 'uploads',newFilename), async (err)=>{
             if(err){
+                console.log(err);
                 return next(new HttpError(err))
             }
 
@@ -148,7 +154,10 @@ const changeAvtar = async(req, res, next) => {
         }
         res.status(200).json(updatedAvtar)
     })
+       
+
      } catch (error) {
+        console.log(error);
         return next(new HttpError(error))
     }
 }
